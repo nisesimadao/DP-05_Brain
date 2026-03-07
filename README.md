@@ -8,20 +8,32 @@ Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage 
 
 ## ⚙️ 主な機能
 
-- **精密なUIデザイン**: 「塗装金属板」を想定したニューモーフィズム・インダストリアルデザイン。
-- **マルチモジュール表示**:
-  - **Clock**: 巨大なデジタル時計。
-  - **Calendar**: 精密なグリッド形式のカレンダー。
-  - **Time Remaining**: 1日の残り時間をパーセンテージとバーで視覚化。
-  - **Dictionary**: 中学レベルの英単語を「Word of the Day」として表示。
-  - **Todo List**: 現在のタスクステータスを確認。
-  - **System Status**: デバイスのアップタイム等を監視。
+- **精密なUIデザイン**: Nothing OSやTeenage Engineeringのデザインフィッシュにインスパイアされた、インダストリアル・ミニマリズム。
+- **マルチページ・ナビゲーション**: 左右キーによるスムーズな横スライド遷移（Cubic Out easing）を搭載。
+- **4つのビューモード**:
+  - **Dashboard**: 時計、カレンダー、残り時間、Todo、辞書、システム状況を一望。
+  - **Huge Clock & Calendar**: 上半分に巨大な時計、下半分に巨大なカレンダーを配置した詳細表示。
+  - **Todo List (TofuMental Sync)**: Todoアプリ「TofuMental」の `tasks.txt` と完全同期（UTF-16LE）。
+  - **Dictionary Detail**: 「Word of the Day」の詳細情報を表示。
 - **高度なカスタマイズ**:
-  - **Night Mode**: 暗所での運用を想定した発光モード（ディープレッド、アンバー、フォスフォグリーン等のアクセント）。
-  - **多彩なフォント**: `teno` シリーズや `CP period` など、計測器らしいビットマップライクなフォントをサポート。
-  - **Accent Colors**: グリーン、アンバー、ブルー、レッドなどのアクセント選択。
-- **保護機能**: 液晶焼き付き防止のための **Sub-Pixel Drift Matrix** 機構を搭載。
-- **スムーズな遷移**: Dashboard と Settings 間の物理的な構造分解アニメーション。
+  - **Settings Menu**: Enterキーで「構造分解アニメーション」と共に開く多機能設定。
+  - **Night Mode**: 明暗に合わせた配色切り替え。アクセントカラー（Green, Amber, Blue, Red, White）を選択可能。
+  - **Font Matrix**: `teno` シリーズや `CP period` など、計測器らしいビットマップフォントを自在に選択。
+- **永続性 & 保護**:
+  - **Auto Saving**: 設定変更は即座に `DP05_Settings.cfg` へ保存。
+  - **Burn-in Guard**: 液晶焼き付き防止のための **Sub-Pixel Drift Matrix** 機構。
+
+## ⌨️ 操作方法
+
+| キー | アクション |
+| :--- | :--- |
+| **左右キー** | ページ（Dashboard / Clock / Todo / Dictionary）の切り替え |
+| **Enter (Dashboard)** | 設定画面（Settings）を開く |
+| **Enter (Settings)** | 設定の確定・設定画面を閉じる |
+| **上下キー (Settings)** | 項目選択 / 値の変更 |
+| **上下キー (Todo/Dict)** | 項目選択 / スクロール |
+| **Space (Todo)** | タスクの完了状態を切り替え（`tasks.txt` へ即座に保存） |
+| **Escape** | アプリの終了（および設定画面を閉じる） |
 
 ## 📁 プロジェクト構成
 
