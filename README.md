@@ -1,4 +1,4 @@
-# DP-05 "Measurement Device Dashboard"
+# DP-05
 
 ![DP-05 Icon](assets/images/icon.png)
 
