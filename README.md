@@ -18,7 +18,7 @@ Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage 
 - **高度なカスタマイズ**:
   - **Settings Menu**: Enterキーで「構造分解アニメーション」と共に開く多機能設定。
   - **Night Mode**: 明暗に合わせた配色切り替え。アクセントカラー（Green, Amber, Blue, Red, White）を選択可能。
-  - **Font Matrix**: `TenoText` シリーズや `CP period` など、計測器らしいビットマップフォント（[TenoText](https://tenokun.neocities.org/)[CP period](https://yokutobanaitori.web.fc2.com/quizfont.html#quizfont6)）を自在に選択。
+  - **Font Matrix**: `TenoText` シリーズや `CP period` など、計測器らしいビットマップフォント（[TenoText](https://tenokun.neocities.org/)⠀[CP period](https://yokutobanaitori.web.fc2.com/quizfont.html#quizfont6)）を自在に選択。
 - **永続性 & 保護**:
   - **Auto Saving**: 設定変更は即座に `DP05_Settings.cfg` へ保存。
   - **Burn-in Guard**: 液晶焼き付き防止のための **Sub-Pixel Drift Matrix** 機構。
