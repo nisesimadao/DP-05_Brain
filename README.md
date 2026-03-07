@@ -13,12 +13,12 @@ Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage 
 - **4つのビューモード**:
   - **Dashboard**: 時計、カレンダー、残り時間、Todo、辞書、システム状況を一望。
   - **Huge Clock & Calendar**: 上半分に巨大な時計、下半分に巨大なカレンダーを配置した詳細表示。
-  - **Todo List (TofuMental Sync)**: Todoアプリ「TofuMental」の `tasks.txt` と完全同期（UTF-16LE）。
+  - **Todo List (TofuMental Sync)**: Todoアプリ[TofuMental](https://github.com/nisesimadao/TofuMental)の `tasks.txt` と完全同期（UTF-16LE）。
   - **Dictionary Detail**: 「Word of the Day」の詳細情報を表示。
 - **高度なカスタマイズ**:
   - **Settings Menu**: Enterキーで「構造分解アニメーション」と共に開く多機能設定。
   - **Night Mode**: 明暗に合わせた配色切り替え。アクセントカラー（Green, Amber, Blue, Red, White）を選択可能。
-  - **Font Matrix**: `TenoText` シリーズや `CP period` など、計測器らしいビットマップフォントを自在に選択。
+  - **Font Matrix**: `TenoText` シリーズや `CP period` など、計測器らしいビットマップフォント（[TenoText](https://tenokun.neocities.org/)[CP period](https://yokutobanaitori.web.fc2.com/quizfont.html#quizfont6)）を自在に選択。
 - **永続性 & 保護**:
   - **Auto Saving**: 設定変更は即座に `DP05_Settings.cfg` へ保存。
   - **Burn-in Guard**: 液晶焼き付き防止のための **Sub-Pixel Drift Matrix** 機構。
