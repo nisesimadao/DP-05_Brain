@@ -1,12 +1,15 @@
 import wave
 import math
 import struct
+import os
+import sys
 
-def generate_beep(filename, frequency=440.0, duration=0.1, volume=0.5):
+def generate_beep(output_dir, filename, frequency=440.0, duration=0.1, volume=0.5):
+    filepath = os.path.join(output_dir, filename)
     sample_rate = 22050
     n_samples = int(sample_rate * duration)
     
-    with wave.open(filename, 'w') as wav_file:
+    with wave.open(filepath, 'w') as wav_file:
         wav_file.setnchannels(1) # Mono
         wav_file.setsampwidth(1) # 8-bit
         wav_file.setframerate(sample_rate)
@@ -23,15 +26,16 @@ def generate_beep(filename, frequency=440.0, duration=0.1, volume=0.5):
                 val *= i / 500.0
             
             # Convert to 8-bit unsigned (0-255, center 128)
-            data = int((val * 0.5 + 0.5) * 255.0)
+            data = int((val * 0.5 + 0.5) * volume * 255.0)
             wav_file.writeframes(struct.pack('B', data))
             
-def generate_chime(filename):
+def generate_chime(output_dir, filename):
+    filepath = os.path.join(output_dir, filename)
     sample_rate = 22050
     duration = 0.4
     n_samples = int(sample_rate * duration)
     
-    with wave.open(filename, 'w') as wav_file:
+    with wave.open(filepath, 'w') as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(1)
         wav_file.setframerate(sample_rate)
@@ -48,34 +52,13 @@ def generate_chime(filename):
             data = int((val * 0.5 + 0.5) * 255.0)
             wav_file.writeframes(struct.pack('B', data))
 
-def generate_buzzer(filename):
-    sample_rate = 22050
-    duration = 0.3
-    n_samples = int(sample_rate * duration)
-    
-    with wave.open(filename, 'w') as wav_file:
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(1)
-        wav_file.setframerate(sample_rate)
-        
-        for i in range(n_samples):
-            t = float(i) / sample_rate
-            # Sawtooth-ish
-            val = (math.sin(2.0 * math.pi * 150.0 * t) + \
-                   math.sin(2.0 * math.pi * 300.0 * t) * 0.5)
-            
-            if val > 1.0: val = 1.0
-            if val < -1.0: val = -1.0
-            
-            data = int((val * 0.5 + 0.5) * 255.0)
-            wav_file.writeframes(struct.pack('B', data))
-            
-def generate_finish(filename):
+def generate_finish(output_dir, filename):
+    filepath = os.path.join(output_dir, filename)
     sample_rate = 22050
     duration = 1.5
     n_samples = int(sample_rate * duration)
     
-    with wave.open(filename, 'w') as wav_file:
+    with wave.open(filepath, 'w') as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(1)
         wav_file.setframerate(sample_rate)
@@ -94,8 +77,15 @@ def generate_finish(filename):
             wav_file.writeframes(struct.pack('B', data))
 
 if __name__ == "__main__":
-    generate_beep("hit.wav", frequency=1200.0, duration=0.05, volume=0.3)
-    generate_chime("ok.wav")
-    generate_buzzer("error.wav")
-    generate_finish("finish.wav")
-    print("Generated all sounds.")
+    if len(sys.argv) < 2:
+        print("Usage: python make_sounds.py <output_dir>")
+        sys.exit(1)
+    
+    out_dir = sys.argv[1]
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+        
+    generate_beep(out_dir, "hit.wav", frequency=1200.0, duration=0.05, volume=0.3)
+    generate_chime(out_dir, "ok.wav")
+    generate_finish(out_dir, "finish.wav")
+    print(f"Generated all sounds in {out_dir}")

@@ -1,5 +1,5 @@
 /*
- * DP-05 "Measurement Device OS" Dashboard for Sharp Brain PW-SH2 (Windows
+ * DP-05 "Measurement Device Dashboard" for Sharp Brain PW-SH2 (Windows
  * Embedded CE 6.0) Ported from Next.js project. Features: Borderless UI,
  * Settings Menu, Clock, Calendar, Time Remaining, Dictionary, Font Selection,
  * Accent Colors.
@@ -159,6 +159,70 @@ void PathJoin(TCHAR *out, const TCHAR *base, const TCHAR *file) {
     _tcscat(out, _T("\\"));
   }
   _tcscat(out, file);
+}
+
+void GetDeviceString(TCHAR *out, int maxLen) {
+#ifdef _WIN32_WCE
+  TCHAR platform[64] = {0};
+  if (SystemParametersInfo(SPI_GETPLATFORMTYPE, sizeof(platform), platform,
+                           0)) {
+    OSVERSIONINFO osv;
+    osv.dwOSVersionInfoSize = sizeof(osv);
+    GetVersionEx(&osv);
+    _sntprintf(out, maxLen, _T("%s (CE %d.%d)"), platform, osv.dwMajorVersion,
+               osv.dwMinorVersion);
+  } else {
+    _sntprintf(out, maxLen, _T("WinCE Device"));
+  }
+#else
+  TCHAR name[MAX_COMPUTERNAME_LENGTH + 1] = {0};
+  DWORD nSize = MAX_COMPUTERNAME_LENGTH + 1;
+  if (GetComputerName(name, &nSize)) {
+    _sntprintf(out, maxLen, _T("%s"), name);
+  } else {
+    _sntprintf(out, maxLen, _T("Windows PC"));
+  }
+#endif
+}
+
+void SaveSettings() {
+  TCHAR path[MAX_PATH];
+  PathJoin(path, appPath, _T("DP05_Settings.cfg"));
+  FILE *f = _tfopen(path, _T("w"));
+  if (f) {
+    _ftprintf(f, _T("nightMode=%d\n"), nightMode ? 1 : 0);
+    _ftprintf(f, _T("burninGuard=%d\n"), burninGuard ? 1 : 0);
+    _ftprintf(f, _T("selectedAccent=%d\n"), g_selectedAccent);
+    _ftprintf(f, _T("selectedClockFont=%d\n"), g_selectedClockFont);
+    _ftprintf(f, _T("selectedMainFont=%d\n"), g_selectedMainFont);
+    fclose(f);
+  }
+}
+
+void LoadSettings() {
+  TCHAR path[MAX_PATH];
+  PathJoin(path, appPath, _T("DP05_Settings.cfg"));
+  FILE *f = _tfopen(path, _T("r"));
+  if (f) {
+    TCHAR line[256];
+    while (_fgetts(line, 256, f)) {
+      int val = 0;
+      if (_tcsncmp(line, _T("nightMode="), 10) == 0) {
+        _stscanf(line + 10, _T("%d"), &val);
+        nightMode = (val != 0);
+      } else if (_tcsncmp(line, _T("burninGuard="), 12) == 0) {
+        _stscanf(line + 12, _T("%d"), &val);
+        burninGuard = (val != 0);
+      } else if (_tcsncmp(line, _T("selectedAccent="), 15) == 0) {
+        _stscanf(line + 15, _T("%d"), &g_selectedAccent);
+      } else if (_tcsncmp(line, _T("selectedClockFont="), 18) == 0) {
+        _stscanf(line + 18, _T("%d"), &g_selectedClockFont);
+      } else if (_tcsncmp(line, _T("selectedMainFont="), 17) == 0) {
+        _stscanf(line + 17, _T("%d"), &g_selectedMainFont);
+      }
+    }
+    fclose(f);
+  }
 }
 
 void UpdateColors() {
@@ -470,7 +534,9 @@ void DrawSystemModule(HDC hdc, RECT r) {
   SelectObject(hdc, hFontTiny);
   RECT rStat1 = {r.left + 10, r.top + 35, r.right - 10, r.top + 50};
   DrawText(hdc, buf, -1, &rStat1, DT_LEFT | DT_TOP | DT_SINGLELINE);
-  _stprintf(buf, _T("DEVICE: DP-05 OS"));
+  TCHAR devInfo[128];
+  GetDeviceString(devInfo, 128);
+  _stprintf(buf, _T("DEVICE: %s"), devInfo);
   RECT rStat2 = {r.left + 10, r.top + 55, r.right - 10, r.top + 70};
   DrawText(hdc, buf, -1, &rStat2, DT_LEFT | DT_TOP | DT_SINGLELINE);
 }
@@ -758,9 +824,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
           UpdateColors();
         if (needsFont)
           RefreshFonts();
+        SaveSettings();
         InvalidateRect(hWnd, NULL, TRUE);
       }
     }
+    break;
+  case WM_DESTROY:
+    SaveSettings();
+    PostQuitMessage(0);
     break;
   case WM_PAINT: {
     PAINTSTRUCT ps;
@@ -891,7 +962,7 @@ int main(int argc, char **argv) {
     TCHAR fPath[MAX_PATH];
     PathJoin(fPath, appPath, g_fonts[i].fileName);
 
-    // Check if file exists before adding to avoid major OS delays
+    // Check if file exists before adding to avoid major system delays
     if (GetFileAttributes(fPath) != INVALID_FILE_ATTRIBUTES) {
       int res = AddFontResource(fPath);
       if (res == 0) {
@@ -927,6 +998,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     AddFontResource(fPath);
   }
   SendMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
+  LoadSettings();
 #endif
   WNDCLASS wc;
   memset(&wc, 0, sizeof(WNDCLASS));

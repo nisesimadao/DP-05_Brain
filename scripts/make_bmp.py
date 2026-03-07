@@ -2,7 +2,7 @@ from PIL import Image
 import sys
 import os
 
-def convert_to_bmps(input_path):
+def convert_to_bmps(input_path, output_dir):
     try:
         img = Image.open(input_path)
         # Background composite
@@ -16,23 +16,25 @@ def convert_to_bmps(input_path):
         else:
             img = img.convert('RGB')
         
-        # 1. Standard 24-bit BMP
-        img.save("icon.bmp", 'BMP')
-        print("Generated icon.bmp (24-bit)")
+        # Ensure output directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
-        # 2. 16-bit BMP (RGB565) - Often more compatible for CE
-        # Pillow doesn't support direct 16-bit BMP save easily, 
-        # but standard save with RGB might be 24-bit.
-        # We can try to force 8-bit (palette) which is also very compatible.
-        
+        # 1. Standard 24-bit BMP
+        img.save(os.path.join(output_dir, "icon.bmp"), 'BMP')
+        print(f"Generated {os.path.join(output_dir, 'icon.bmp')} (24-bit)")
+
         # 3. 8-bit Palette BMP
         img_8bit = img.convert('P', palette=Image.ADAPTIVE, colors=256)
-        img_8bit.save("icon8.bmp", 'BMP')
-        print("Generated icon8.bmp (8-bit palette)")
+        img_8bit.save(os.path.join(output_dir, "icon8.bmp"), 'BMP')
+        print(f"Generated {os.path.join(output_dir, 'icon8.bmp')} (8-bit palette)")
 
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    convert_to_bmps("icon.png")
+    if len(sys.argv) < 3:
+        print("Usage: python make_bmp.py <input_png> <output_dir>")
+        sys.exit(1)
+    convert_to_bmps(sys.argv[1], sys.argv[2])
