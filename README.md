@@ -1,10 +1,10 @@
-# DP-05 "Measurement Device Dashboard"
+# DP-05
 
 ![DP-05 Icon](assets/images/icon.png)
 
 Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage Engineering の精密機器デザインにインスパイアされたダッシュボード・アプリケーションです。
 
-単なる時計アプリではなく、時間を中核とした**「計測装置」**としての緊迫感と美学を追求しています。
+単なる時計アプリではなく、時間を中核とした **「計測装置」** としての緊迫感と美学を追求しています。
 
 ## ⚙️ 主な機能
 
@@ -18,7 +18,7 @@ Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage 
 - **高度なカスタマイズ**:
   - **Settings Menu**: Enterキーで「構造分解アニメーション」と共に開く多機能設定。
   - **Night Mode**: 明暗に合わせた配色切り替え。アクセントカラー（Green, Amber, Blue, Red, White）を選択可能。
-  - **Font Matrix**: `teno` シリーズや `CP period` など、計測器らしいビットマップフォントを自在に選択。
+  - **Font Matrix**: `TenoText` シリーズや `CP period` など、計測器らしいビットマップフォントを自在に選択。
 - **永続性 & 保護**:
   - **Auto Saving**: 設定変更は即座に `DP05_Settings.cfg` へ保存。
   - **Burn-in Guard**: 液晶焼き付き防止のための **Sub-Pixel Drift Matrix** 機構。
