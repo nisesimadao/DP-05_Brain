@@ -1,0 +1,13 @@
+{
+  "nightMode": false,
+  "glowColor": "green",
+  "burninGuard": false,
+  "burninCrtMode": false,
+  "fontWeight": 500,
+  "secondsScale": 50,
+  "thinOverride": false,
+  "monoEnforce": true,
+  "fontMain": "var(--font-jetbrains-mono)",
+  "fontUI": "var(--font-geist-sans)",
+  "reloadCounter": 0
+}

@@ -1,0 +1,38 @@
+{
+  "name": "dp05-nextjs-temp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:android": "next dev -p 80",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/device": "^8.0.1",
+    "@capacitor/ios": "^8.1.0",
+    "@capacitor/network": "^8.0.1",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "systeminformation": "^5.31.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "browserslist": [
+    "> 0.5%",
+    "last 3 versions",
+    "chrome > 60",
+    "android > 5",
+    "not dead"
+  ]
+}
