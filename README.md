@@ -87,3 +87,5 @@ cd build_scripts
 ---
 
 *Developed for the legacy, repurposed with aesthetics.*
+
+[MIT License](LICENSE)
