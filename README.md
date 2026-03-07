@@ -22,6 +22,9 @@ Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage 
 - **永続性 & 保護**:
   - **Auto Saving**: 設定変更は即座に `DP05_Settings.cfg` へ保存。
   - **Burn-in Guard**: 液晶焼き付き防止のための **Sub-Pixel Drift Matrix** 機構。
+  
+<img alt="ScreenShots" src="ScreenShots.png" />
+
 
 ## ⌨️ 操作方法
 
