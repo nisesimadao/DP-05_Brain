@@ -25,8 +25,11 @@
 // --- Constants ---
 #define ID_TIMER_CLOCK 1
 #define ID_TIMER_DRIFT 2
+#define ID_TIMER_TRANSITION 4
 #define TIMER_CLOCK_MS 1000
 #define TIMER_DRIFT_MS 60000
+const int TRANSITION_STEP_MS = 20;
+const float TRANSITION_SPEED = 0.15f;
 
 // --- UI Globals ---
 RECT clientRect;
@@ -48,16 +51,26 @@ COLORREF COL_PLATE_SHADOW = RGB(180, 180, 180);
 
 // State
 bool nightMode = false;
-bool settingsOpen = false;
 bool burninGuard = true;
 bool isSplashing = true;
 DWORD splashStartTime = 0;
 int fontWeight = FW_BOLD;
 
+// Transition State
+bool settingsOpen = false; // Current state: true if settings are fully open,
+                           // false if dashboard is fully open
+bool g_isTransitioning = false;
+bool g_targetSettingsState = false; // Target state for transition: true for
+                                    // settings, false for dashboard
+float g_transitionPos = 0.0f;       // 0.0 = Dashboard, 1.0 = Settings
+
 int driftX = 0;
 int driftY = 0;
 int driftCycle = 0;
 int settingsFocus = 0;
+
+HBITMAP hDashCache = NULL;
+HBITMAP hSettCache = NULL;
 
 // Accents
 struct AccentInfo {
@@ -110,9 +123,21 @@ HBITMAP LoadBMPFromFile(const TCHAR *filename) {
   BITMAPINFOHEADER bih;
   ReadFile(hFile, &bih, sizeof(bih), &read, NULL);
   DWORD size = bfh.bfSize - bfh.bfOffBits;
+  if (size == 0) {
+    CloseHandle(hFile);
+    return NULL;
+  }
   void *bits = malloc(size);
+  if (!bits) {
+    CloseHandle(hFile);
+    return NULL;
+  }
   SetFilePointer(hFile, bfh.bfOffBits, NULL, FILE_BEGIN);
-  ReadFile(hFile, bits, size, &read, NULL);
+  if (!ReadFile(hFile, bits, size, &read, NULL) || read != size) {
+    free(bits);
+    CloseHandle(hFile);
+    return NULL;
+  }
   CloseHandle(hFile);
   HDC hdc = GetDC(NULL);
   void *ppvBits;
@@ -126,6 +151,8 @@ HBITMAP LoadBMPFromFile(const TCHAR *filename) {
 }
 
 void PathJoin(TCHAR *out, const TCHAR *base, const TCHAR *file) {
+  if (!out || !base || !file)
+    return;
   _tcscpy(out, base);
   size_t len = _tcslen(out);
   if (len > 0 && out[len - 1] != _T('\\') && out[len - 1] != _T('/')) {
@@ -232,8 +259,19 @@ void DrawSplash(HDC hdc, RECT r) {
     HBITMAP hOldBm = (HBITMAP)SelectObject(hdcMem, g_hSplashBm);
     BITMAP bm;
     GetObject(g_hSplashBm, sizeof(bm), &bm);
+
+    // Splash Animation: Slide up from center + 50 to center
+    DWORD elapsed = GetTickCount() - splashStartTime;
+    float progress = (float)elapsed / 2000.0f;
+    if (progress > 1.0f)
+      progress = 1.0f;
+    // EaseOut for splash
+    float easedProgress = 1.0f - (1.0f - progress) * (1.0f - progress);
+    int targetY = r.top + (r.bottom - r.top - bm.bmHeight) / 2;
+    int startY = targetY + 50;
+    int y = (int)(startY - (startY - targetY) * easedProgress);
     int x = r.left + (r.right - r.left - bm.bmWidth) / 2;
-    int y = r.top + (r.bottom - r.top - bm.bmHeight) / 2;
+
     BitBlt(hdc, x, y, bm.bmWidth, bm.bmHeight, hdcMem, 0, 0, SRCCOPY);
     SelectObject(hdcMem, hOldBm);
     DeleteDC(hdcMem);
@@ -475,6 +513,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
   case WM_CREATE:
     SetTimer(hWnd, ID_TIMER_CLOCK, TIMER_CLOCK_MS, NULL);
     SetTimer(hWnd, ID_TIMER_DRIFT, TIMER_DRIFT_MS, NULL);
+    g_transitionPos = 0.0f;
     splashStartTime = GetTickCount();
     {
       Sleep(100);
@@ -515,14 +554,159 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         driftX = (rand() % 7) - 3;
       else
         driftY = (rand() % 7) - 3;
+    } else if (wParam == ID_TIMER_TRANSITION) {
+      float step = 0.05f; // Raw linear step
+      if (g_targetSettingsState) {
+        float nextPos =
+            g_transitionPos + (1.0f - g_transitionPos) * 0.2f + 0.02f;
+        if (nextPos >= 1.0f) {
+          g_transitionPos = 1.0f;
+          g_isTransitioning = false;
+          settingsOpen = true;
+          if (hDashCache) {
+            DeleteObject(hDashCache);
+            hDashCache = NULL;
+          }
+          if (hSettCache) {
+            DeleteObject(hSettCache);
+            hSettCache = NULL;
+          }
+          KillTimer(hWnd, ID_TIMER_TRANSITION);
+        } else {
+          g_transitionPos = nextPos;
+        }
+      } else {
+        float nextPos = g_transitionPos - (g_transitionPos) * 0.2f - 0.02f;
+        if (nextPos <= 0.0f) {
+          g_transitionPos = 0.0f;
+          g_isTransitioning = false;
+          settingsOpen = false;
+          if (hDashCache) {
+            DeleteObject(hDashCache);
+            hDashCache = NULL;
+          }
+          if (hSettCache) {
+            DeleteObject(hSettCache);
+            hSettCache = NULL;
+          }
+          KillTimer(hWnd, ID_TIMER_TRANSITION);
+        } else {
+          g_transitionPos = nextPos;
+        }
+      }
+      InvalidateRect(hWnd, NULL, FALSE);
     }
     break;
   case WM_KEYDOWN:
-    if (wParam == VK_ESCAPE)
-      PostQuitMessage(0);
-    else if (wParam == VK_RETURN) {
-      settingsOpen = !settingsOpen;
-      InvalidateRect(hWnd, NULL, TRUE);
+    if (wParam == VK_ESCAPE) {
+      if (settingsOpen && !g_isTransitioning) {
+        // Trigger transition back
+        HDC hdc = GetDC(hWnd);
+        HDC hdcMem = CreateCompatibleDC(hdc);
+        if (hDashCache)
+          DeleteObject(hDashCache);
+        if (hSettCache)
+          DeleteObject(hSettCache);
+        hDashCache =
+            CreateCompatibleBitmap(hdc, clientRect.right, clientRect.bottom);
+        hSettCache =
+            CreateCompatibleBitmap(hdc, clientRect.right, clientRect.bottom);
+        HBITMAP hOld = (HBITMAP)SelectObject(hdcMem, hDashCache);
+        HBRUSH hbg = CreateSolidBrush(COL_BG);
+        FillRect(hdcMem, &clientRect, hbg);
+        DeleteObject(hbg);
+        {
+          RECT rUpper = {10, 10 + driftY, clientRect.right - 10,
+                         clientRect.bottom / 2 - 5 + driftY};
+          DrawPlate(hdcMem, rUpper, false);
+          RECT rClockRect = {rUpper.left + 10, rUpper.top + 10,
+                             rUpper.right - 160, rUpper.bottom - 10};
+          DrawClockModule(hdcMem, rClockRect);
+          RECT rCalRect = {rUpper.right - 150, rUpper.top + 10,
+                           rUpper.right - 10, rUpper.bottom - 10};
+          DrawCalendarModule(hdcMem, rCalRect);
+          RECT rLower = {10 + driftX, clientRect.bottom / 2 + 5,
+                         clientRect.right - 10 + driftX,
+                         clientRect.bottom - 10};
+          DrawPlate(hdcMem, rLower, true);
+          RECT rWordRect = {rLower.left + 10, rLower.top + 10,
+                            rLower.right - 210, rLower.bottom - 10};
+          DrawDictionaryModule(hdcMem, rWordRect);
+          RECT rTodoRect = {rLower.right - 200, rLower.top + 10,
+                            rLower.right - 10, rLower.bottom - 10};
+          DrawTodoModule(hdcMem, rTodoRect);
+        }
+        SelectObject(hdcMem, hSettCache);
+        hbg = CreateSolidBrush(COL_BG);
+        FillRect(hdcMem, &clientRect, hbg);
+        DeleteObject(hbg);
+        DrawSettings(hdcMem, clientRect);
+        SelectObject(hdcMem, hOld);
+        DeleteDC(hdcMem);
+        ReleaseDC(hWnd, hdc);
+
+        g_isTransitioning = true;
+        g_targetSettingsState = false;
+        SetTimer(hWnd, ID_TIMER_TRANSITION, TRANSITION_STEP_MS, NULL);
+      } else {
+        PostQuitMessage(0);
+      }
+    } else if (wParam == VK_RETURN) {
+      if (!g_isTransitioning) {
+        // Pre-render caches
+        HDC hdc = GetDC(hWnd);
+        HDC hdcMem = CreateCompatibleDC(hdc);
+        if (hDashCache)
+          DeleteObject(hDashCache);
+        if (hSettCache)
+          DeleteObject(hSettCache);
+        hDashCache =
+            CreateCompatibleBitmap(hdc, clientRect.right, clientRect.bottom);
+        hSettCache =
+            CreateCompatibleBitmap(hdc, clientRect.right, clientRect.bottom);
+
+        // Render Dash
+        HBITMAP hOld = (HBITMAP)SelectObject(hdcMem, hDashCache);
+        HBRUSH hbg = CreateSolidBrush(COL_BG);
+        FillRect(hdcMem, &clientRect, hbg);
+        DeleteObject(hbg);
+        {
+          RECT rUpper = {10, 10 + driftY, clientRect.right - 10,
+                         clientRect.bottom / 2 - 5 + driftY};
+          DrawPlate(hdcMem, rUpper, false);
+          RECT rClockRect = {rUpper.left + 10, rUpper.top + 10,
+                             rUpper.right - 160, rUpper.bottom - 10};
+          DrawClockModule(hdcMem, rClockRect);
+          RECT rCalRect = {rUpper.right - 150, rUpper.top + 10,
+                           rUpper.right - 10, rUpper.bottom - 10};
+          DrawCalendarModule(hdcMem, rCalRect);
+          RECT rLower = {10 + driftX, clientRect.bottom / 2 + 5,
+                         clientRect.right - 10 + driftX,
+                         clientRect.bottom - 10};
+          DrawPlate(hdcMem, rLower, true);
+          RECT rWordRect = {rLower.left + 10, rLower.top + 10,
+                            rLower.right - 210, rLower.bottom - 10};
+          DrawDictionaryModule(hdcMem, rWordRect);
+          RECT rTodoRect = {rLower.right - 200, rLower.top + 10,
+                            rLower.right - 10, rLower.bottom - 10};
+          DrawTodoModule(hdcMem, rTodoRect);
+        }
+
+        // Render Settings
+        SelectObject(hdcMem, hSettCache);
+        hbg = CreateSolidBrush(COL_BG);
+        FillRect(hdcMem, &clientRect, hbg);
+        DeleteObject(hbg);
+        DrawSettings(hdcMem, clientRect);
+
+        SelectObject(hdcMem, hOld);
+        DeleteDC(hdcMem);
+        ReleaseDC(hWnd, hdc);
+
+        g_isTransitioning = true;
+        g_targetSettingsState = !settingsOpen;
+        SetTimer(hWnd, ID_TIMER_TRANSITION, TRANSITION_STEP_MS, NULL);
+      }
     }
     if (settingsOpen) {
       if (wParam == VK_UP) {
@@ -563,8 +747,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
           else
             g_selectedMainFont = (g_selectedMainFont + 1) % g_fontCount;
           needsFont = true;
-        } else if (settingsFocus == 6)
-          settingsOpen = false;
+        } else if (settingsFocus == 6) {
+          if (!g_isTransitioning) {
+            g_isTransitioning = true;
+            g_targetSettingsState = false;
+            SetTimer(hWnd, ID_TIMER_TRANSITION, TRANSITION_STEP_MS, NULL);
+          }
+        }
         if (needsColor)
           UpdateColors();
         if (needsFont)
@@ -587,10 +776,44 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 
     if (isSplashing) {
       DrawSplash(hdcMem, clientRect);
+    } else if (g_isTransitioning ||
+               (g_transitionPos > 0.0f && g_transitionPos < 1.0f)) {
+      // Transition Slide
+      int offsetX = (int)(g_transitionPos * clientRect.right);
+
+      // Draw Dashboard (shifted left)
+      RECT rDash = {-offsetX, 0, clientRect.right - offsetX, clientRect.bottom};
+      {
+        RECT rUpper = {rDash.left + 10, 10 + driftY, rDash.right - 10,
+                       rDash.bottom / 2 - 5 + driftY};
+        DrawPlate(hdcMem, rUpper, false);
+        RECT rClockRect = {rUpper.left + 10, rUpper.top + 10,
+                           rUpper.right - 160, rUpper.bottom - 10};
+        DrawClockModule(hdcMem, rClockRect);
+        RECT rCalRect = {rUpper.right - 150, rUpper.top + 10, rUpper.right - 10,
+                         rUpper.bottom - 10};
+        DrawCalendarModule(hdcMem, rCalRect);
+        RECT rLower = {rDash.left + 10 + driftX, rDash.bottom / 2 + 5,
+                       rDash.right - 10 + driftX, rDash.bottom - 10};
+        DrawPlate(hdcMem, rLower, true);
+        RECT rWordRect = {rLower.left + 10, rLower.top + 10, rLower.right - 210,
+                          rLower.bottom - 10};
+        DrawDictionaryModule(hdcMem, rWordRect);
+        RECT rTodoRect = {rLower.right - 200, rLower.top + 10,
+                          rLower.right - 10, rLower.bottom - 10};
+        DrawTodoModule(hdcMem, rTodoRect);
+      }
+
+      // Draw Settings (shifted right)
+      RECT rSett = {clientRect.right - offsetX, 0,
+                    clientRect.right * 2 - offsetX, clientRect.bottom};
+      DrawSettings(hdcMem, rSett);
+
     } else if (settingsOpen) {
       DrawSettings(hdcMem, clientRect);
     } else {
-      RECT rUpper = {10, 10, clientRect.right - 10, clientRect.bottom / 2 - 5};
+      RECT rUpper = {10, 10 + driftY, clientRect.right - 10,
+                     clientRect.bottom / 2 - 5 + driftY};
       DrawPlate(hdcMem, rUpper, false);
       RECT rClockRect = {rUpper.left + 10, rUpper.top + 10, rUpper.right - 160,
                          rUpper.bottom - 10};
@@ -667,14 +890,18 @@ int main(int argc, char **argv) {
   for (int i = 0; i < g_fontCount; i++) {
     TCHAR fPath[MAX_PATH];
     PathJoin(fPath, appPath, g_fonts[i].fileName);
-    int res = AddFontResource(fPath);
-    if (res == 0) {
-      // Try local fallback
-      res = AddFontResource(g_fonts[i].fileName);
-    }
-    if (res == 0) {
-      _stprintf(failMsg + _tcslen(failMsg), _T("- %s FAILED (err %d)\n"),
-                g_fonts[i].fileName, GetLastError());
+
+    // Check if file exists before adding to avoid major OS delays
+    if (GetFileAttributes(fPath) != INVALID_FILE_ATTRIBUTES) {
+      int res = AddFontResource(fPath);
+      if (res == 0) {
+        _stprintf(failMsg + _tcslen(failMsg), _T("- %s FAILED (err %d)\n"),
+                  g_fonts[i].fileName, GetLastError());
+        failCount++;
+      }
+    } else {
+      _stprintf(failMsg + _tcslen(failMsg), _T("- %s NOT FOUND\n"),
+                g_fonts[i].fileName);
       failCount++;
     }
   }
