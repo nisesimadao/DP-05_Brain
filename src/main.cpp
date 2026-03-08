@@ -651,7 +651,7 @@ void UpdateParticles(int width) {
   }
 }
 
-void DrawParticles(HDC hdc, RECT r) {
+void DrawParticles(HDC hdc, RECT /*r*/) {
   for (const auto &p : g_particles) {
     int py = (int)(p.y + sin(p.waveOffset) * 10);
     HBRUSH hBrush = CreateSolidBrush(p.color);
@@ -1303,7 +1303,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 }
 
 #ifdef UNDER_CE
-int main(int argc, char **argv) {
+int main(int /*argc*/, char ** /*argv*/) {
   HINSTANCE hInstance = GetModuleHandle(NULL);
   int nCmdShow = SW_SHOW;
   GetModuleFileName(NULL, appPath, MAX_PATH);
