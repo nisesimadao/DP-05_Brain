@@ -24,7 +24,6 @@
 #include <wctype.h>
 #include <windows.h>
 
-
 // --- Constants ---
 #define ID_TIMER_CLOCK 1
 #define ID_TIMER_DRIFT 2
@@ -61,6 +60,10 @@ bool isSplashing = true;
 DWORD splashStartTime = 0;
 int fontWeight = FW_BOLD;
 bool g_isDecorated = false; // Borderless by default
+float g_uiScale = 1.0f;     // UI Scaling factor
+#define S(v) ((int)((v) * g_uiScale))
+
+int settingsScroll = 0; // Settings scroll offset
 
 // Transition State
 bool settingsOpen = false;
@@ -230,6 +233,7 @@ void SaveSettings() {
     _ftprintf(f, _T("selectedAccent=%d\n"), g_selectedAccent);
     _ftprintf(f, _T("selectedClockFont=%d\n"), g_selectedClockFont);
     _ftprintf(f, _T("selectedMainFont=%d\n"), g_selectedMainFont);
+    _ftprintf(f, _T("uiScale=%f\n"), g_uiScale);
     fclose(f);
   }
 }
@@ -254,6 +258,8 @@ void LoadSettings() {
         _stscanf(line + 18, _T("%d"), &g_selectedClockFont);
       } else if (_tcsncmp(line, _T("selectedMainFont="), 17) == 0) {
         _stscanf(line + 17, _T("%d"), &g_selectedMainFont);
+      } else if (_tcsncmp(line, _T("uiScale="), 8) == 0) {
+        _stscanf(line + 8, _T("%f"), &g_uiScale);
       }
     }
     fclose(f);
@@ -304,15 +310,17 @@ void RefreshFonts() {
   const TCHAR *mainFace = g_fonts[g_selectedMainFont].faceName;
   const TCHAR *jpFace = _T("CP period");
 
-  hFontClock = CreateFontSimple(80, fontWeight, clockFace);
-  hFontMain = CreateFontSimple(24, fontWeight, mainFace);
-  hFontSmall = CreateFontSimple(16, FW_NORMAL, mainFace);
-  hFontTiny = CreateFontSimple(12, FW_NORMAL, mainFace);
-  hFontUI = CreateFontSimple(18, FW_BOLD, mainFace);
-  hFontJp = CreateFontSimple(20, FW_NORMAL, jpFace);
+  hFontClock = CreateFontSimple((int)(80 * g_uiScale), fontWeight, clockFace);
+  hFontMain = CreateFontSimple((int)(24 * g_uiScale), fontWeight, mainFace);
+  hFontSmall = CreateFontSimple((int)(16 * g_uiScale), FW_NORMAL, mainFace);
+  hFontTiny = CreateFontSimple((int)(12 * g_uiScale), FW_NORMAL, mainFace);
+  hFontUI = CreateFontSimple((int)(18 * g_uiScale), FW_BOLD, mainFace);
+  hFontJp = CreateFontSimple((int)(20 * g_uiScale), FW_NORMAL, jpFace);
 }
 
 void DrawPlate(HDC hdc, RECT r, bool convex, int radius = 12) {
+  if (radius == 12)
+    radius = S(12);
   HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, CreateSolidBrush(COL_BG));
   HPEN hOldPen = (HPEN)SelectObject(hdc, GetStockObject(NULL_PEN));
   int dx = burninGuard ? driftX : 0;
@@ -487,18 +495,18 @@ void DrawCalendarModule(HDC hdc, RECT r) {
   _stprintf(header, _T("%s %d"), monthNames[st.wMonth - 1], st.wYear);
   SelectObject(hdc, hFontSmall);
   SetTextColor(hdc, COL_TEXT);
-  RECT rHeader = {r.left, r.top + 5, r.right, r.top + 25};
+  RECT rHeader = {r.left, r.top + S(5), r.right, r.top + S(35)};
   DrawText(hdc, header, -1, &rHeader, DT_CENTER | DT_TOP | DT_SINGLELINE);
   const TCHAR *days[] = {_T("S"), _T("M"), _T("T"), _T("W"),
                          _T("T"), _T("F"), _T("S")};
   SelectObject(hdc, hFontTiny);
   int colWidth = (r.right - r.left) / 7;
-  int rowHeight = (r.bottom - r.top - 30) / 6;
-  if (rowHeight < 12)
-    rowHeight = 12;
+  int rowHeight = (r.bottom - r.top - S(40)) / 6;
+  if (rowHeight < S(14))
+    rowHeight = S(14);
   for (int i = 0; i < 7; i++) {
-    RECT rDayLabels = {r.left + i * colWidth, r.top + 25,
-                       r.left + (i + 1) * colWidth, r.top + 40};
+    RECT rDayLabels = {r.left + i * colWidth, r.top + S(30),
+                       r.left + (i + 1) * colWidth, r.top + S(50)};
     DrawText(hdc, days[i], -1, &rDayLabels, DT_CENTER | DT_TOP | DT_SINGLELINE);
   }
   SYSTEMTIME stFirst = st;
@@ -545,20 +553,21 @@ void DrawTimeModule(HDC hdc, RECT r) {
             (remainSec % 3600) / 60, remainSec % 60);
   SelectObject(hdc, hFontSmall);
   SetTextColor(hdc, COL_ACCENT);
-  RECT rLabel = {r.left + 10, r.top + 10, r.right, r.top + 25};
+  RECT rLabel = {r.left + S(10), r.top + S(10), r.right, r.top + S(35)};
   DrawText(hdc, _T("TIME REMAINING"), -1, &rLabel,
            DT_LEFT | DT_TOP | DT_SINGLELINE);
   SetTextColor(hdc, COL_TEXT);
   SelectObject(hdc, hFontMain);
-  RECT rTime = {r.left + 10, r.top + 30, r.right - 100, r.top + 60};
+  RECT rTime = {r.left + S(10), r.top + S(35), r.right - S(100), r.top + S(75)};
   DrawText(hdc, buf, -1, &rTime, DT_LEFT | DT_TOP | DT_SINGLELINE);
   TCHAR pBuf[64];
-  _stprintf(pBuf, _T("%d%% DONE / %d%% REMAIN"), donePct, remainPct);
+  _stprintf(pBuf, _T("%d%% DONE"), donePct);
   SelectObject(hdc, hFontTiny);
-  RECT rPct = {r.right - 200, r.top + 40, r.right - 10, r.top + 55};
+  RECT rPct = {r.right - S(200), r.top + S(45), r.right - S(10), r.top + S(70)};
   DrawText(hdc, pBuf, -1, &rPct, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_NOCLIP);
-  RECT rBarBase = {r.left + 10, r.top + 70, r.right - 10, r.top + 85};
-  DrawPlate(hdc, rBarBase, false, 4);
+  RECT rBarBase = {r.left + S(10), r.top + S(80), r.right - S(10),
+                   r.top + S(100)};
+  DrawPlate(hdc, rBarBase, false, S(4));
   int fillWidth = (rBarBase.right - rBarBase.left) * elapsedSec / totalSec;
   if (fillWidth > 0) {
     RECT rBarFill = {rBarBase.left, rBarBase.top, rBarBase.left + fillWidth,
@@ -570,13 +579,13 @@ void DrawTimeModule(HDC hdc, RECT r) {
 void DrawTodoModule(HDC hdc, RECT r) {
   SelectObject(hdc, hFontSmall);
   SetTextColor(hdc, COL_ACCENT);
-  RECT rLabel = {r.left + 10, r.top + 10, r.right, r.top + 25};
+  RECT rLabel = {r.left + S(10), r.top + S(10), r.right, r.top + S(35)};
   DrawText(hdc, _T("TODO LIST"), -1, &rLabel, DT_LEFT | DT_TOP | DT_SINGLELINE);
   SetTextColor(hdc, COL_TEXT);
   SelectObject(hdc, hFontTiny);
   for (size_t i = 0; i < todos.size() && i < 5; i++) {
-    RECT rTodo = {r.left + 10, r.top + 35 + (int)i * 15, r.right - 10,
-                  r.top + 50 + (int)i * 15};
+    RECT rTodo = {r.left + S(10), r.top + S(40) + (int)i * S(20),
+                  r.right - S(10), r.top + S(60) + (int)i * S(20)};
     TCHAR tBuf[128];
     if (todos[i].completed) {
       SetTextColor(hdc, COL_ACCENT);
@@ -593,17 +602,17 @@ void DrawTodoModule(HDC hdc, RECT r) {
 void DrawDictionaryModule(HDC hdc, RECT r) {
   SelectObject(hdc, hFontSmall);
   SetTextColor(hdc, COL_ACCENT);
-  RECT rLabel = {r.left + 10, r.top + 10, r.right, r.top + 25};
+  RECT rLabel = {r.left + S(10), r.top + S(10), r.right, r.top + S(35)};
   DrawText(hdc, _T("WORD OF THE DAY"), -1, &rLabel,
            DT_LEFT | DT_TOP | DT_SINGLELINE);
   SetTextColor(hdc, COL_TEXT);
   SelectObject(hdc, hFontMain);
-  RECT rWord = {r.left + 10, r.top + 30, r.right - 10, r.top + 55};
+  RECT rWord = {r.left + S(10), r.top + S(35), r.right - S(10), r.top + S(65)};
   DrawText(hdc, currentWord.word.c_str(), -1, &rWord,
            DT_LEFT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
   SelectObject(hdc, hFontJp);
   SetTextColor(hdc, COL_TEXT);
-  RECT rJp = {r.left + 10, r.top + 60, r.right - 10, r.top + 95};
+  RECT rJp = {r.left + S(10), r.top + S(70), r.right - S(10), r.top + S(110)};
   DrawText(hdc, currentWord.jp.c_str(), -1, &rJp,
            DT_LEFT | DT_TOP | DT_WORDBREAK);
 }
@@ -611,7 +620,7 @@ void DrawDictionaryModule(HDC hdc, RECT r) {
 void DrawSystemModule(HDC hdc, RECT r) {
   SelectObject(hdc, hFontSmall);
   SetTextColor(hdc, COL_ACCENT);
-  RECT rLabel = {r.left + 10, r.top + 10, r.right, r.top + 25};
+  RECT rLabel = {r.left + S(10), r.top + S(10), r.right, r.top + S(35)};
   DrawText(hdc, _T("SYSTEM STATUS"), -1, &rLabel,
            DT_LEFT | DT_TOP | DT_SINGLELINE);
   DWORD uptime = GetTickCount() / 1000;
@@ -620,23 +629,31 @@ void DrawSystemModule(HDC hdc, RECT r) {
             uptime % 60);
   SetTextColor(hdc, COL_TEXT);
   SelectObject(hdc, hFontTiny);
-  RECT rStat1 = {r.left + 10, r.top + 35, r.right - 10, r.top + 50};
+  RECT rStat1 = {r.left + S(10), r.top + S(40), r.right - S(10), r.top + S(60)};
   DrawText(hdc, buf, -1, &rStat1, DT_LEFT | DT_TOP | DT_SINGLELINE);
   TCHAR devInfo[128];
   GetDeviceString(devInfo, 128);
   _stprintf(buf, _T("DEVICE: %s"), devInfo);
-  RECT rStat2 = {r.left + 10, r.top + 55, r.right - 10, r.top + 70};
+  RECT rStat2 = {r.left + S(10), r.top + S(65), r.right - S(10), r.top + S(85)};
   DrawText(hdc, buf, -1, &rStat2, DT_LEFT | DT_TOP | DT_SINGLELINE);
 }
 
 void InitParticles(int width, int height, float yStartPct, float yRangePct) {
   g_particles.clear();
-  int count = (width > 800) ? 60 : 40;
+  // Area-based density: ~1 particle per 8000 pixels
+  int count = (width * height) / 8000;
+  if (count < 20)
+    count = 20;
+  if (count > 200)
+    count = 200;
+
   COLORREF baseColor = g_accents[g_selectedAccent].color;
   for (int i = 0; i < count; i++) {
     Particle p;
     p.x = (float)(rand() % width);
-    p.y = (float)((height * yStartPct) + (rand() % (int)(height * yRangePct)));
+    float minY = height * yStartPct;
+    float rangeY = height * yRangePct;
+    p.y = minY + (float)(rand() % (int)(rangeY > 1 ? rangeY : 1));
     p.speed = 1.0f + (float)(rand() % 100) / 40.0f;
     p.waveOffset = (float)(rand() % 360);
     p.size = 2.0f + (float)(rand() % 3);
@@ -664,7 +681,7 @@ void UpdateParticles(int width, int height, float yStartPct, float yRangePct) {
       p.trailY[j] = p.trailY[j - 1];
     }
     p.trailX[0] = p.x;
-    int currentY = (int)(p.y + sin(p.waveOffset) * 15);
+    int currentY = (int)(p.y + sin(p.waveOffset) * S(15));
     p.trailY[0] = (float)currentY;
 
     p.x += p.speed;
@@ -694,8 +711,9 @@ void DrawParticles(HDC hdc, RECT /*r*/) {
       DeleteObject(hBrush);
     }
     HBRUSH hBrush = CreateSolidBrush(p.color);
-    int py = (int)(p.y + sin(p.waveOffset) * 15);
-    RECT pr = {(int)p.x, py, (int)(p.x + p.size), (int)(py + p.size)};
+    int py = (int)(p.y + sin(p.waveOffset) * S(15));
+    RECT pr = {(int)p.x, py, (int)(p.x + p.size * g_uiScale),
+               (int)(py + p.size * g_uiScale)};
     FillRect(hdc, &pr, hBrush);
     DeleteObject(hBrush);
   }
@@ -705,10 +723,11 @@ void DrawSettings(HDC hdc, RECT r) {
   HBRUSH hbg = CreateSolidBrush(COL_BG);
   FillRect(hdc, &r, hbg);
   DeleteObject(hbg);
-  const TCHAR *menu[] = {
-      _T("NIGHT MODE"),   _T("ACCENT COLOR"), _T("BURN-IN GUARD"),
-      _T("FONT WEIGHT"),  _T("CLOCK FONT"),   _T("MAIN FONT"),
-      _T("MONITOR SIZE"), _T("WINDOW FRAME"), _T("CLOSE")};
+  const TCHAR *menu[] = {_T("NIGHT MODE"),    _T("ACCENT COLOR"),
+                         _T("BURN-IN GUARD"), _T("FONT WEIGHT"),
+                         _T("CLOCK FONT"),    _T("MAIN FONT"),
+                         _T("MONITOR SIZE"),  _T("WINDOW FRAME"),
+                         _T("UI SCALE"),      _T("CLOSE")};
   const TCHAR *values[] = {nightMode ? _T("ON") : _T("OFF"),
                            g_accents[g_selectedAccent].name,
                            burninGuard ? _T("ON") : _T("OFF"),
@@ -717,22 +736,55 @@ void DrawSettings(HDC hdc, RECT r) {
                            g_fonts[g_selectedMainFont].displayName,
                            _T("MAXIMIZE"),
                            g_isDecorated ? _T("ON") : _T("OFF"),
+                           _T(""),
                            _T("")};
   SetBkMode(hdc, TRANSPARENT);
   SelectObject(hdc, hFontMain);
   SetTextColor(hdc, COL_TEXT);
-  RECT rTitle = {r.left, r.top + 10, r.right, r.top + 50};
+  RECT rTitle = {r.left, r.top + S(10), r.right, r.top + S(60)};
   DrawText(hdc, _T("SETTINGS"), -1, &rTitle, DT_CENTER | DT_TOP);
   SelectObject(hdc, hFontUI);
-  for (int i = 0; i < 9; i++) {
-    RECT rItem = {r.left + 50, r.top + 60 + i * 32, r.right - 50,
-                  r.top + 92 + i * 32};
+
+  int visibleItems = (r.bottom - r.top - S(70)) / S(32);
+  if (visibleItems < 1)
+    visibleItems = 1;
+  if (visibleItems > 10)
+    visibleItems = 10;
+
+  for (int i = settingsScroll; i < 10 && i < settingsScroll + visibleItems;
+       i++) {
+    int displayIdx = i - settingsScroll;
+    RECT rItem = {r.left + S(50), r.top + S(65) + displayIdx * S(32),
+                  r.right - S(50), r.top + S(97) + displayIdx * S(32)};
     if (i == settingsFocus)
       SetTextColor(hdc, RGB(255, 0, 0));
     else
       SetTextColor(hdc, COL_TEXT);
     DrawText(hdc, menu[i], -1, &rItem, DT_LEFT | DT_TOP);
-    DrawText(hdc, values[i], -1, &rItem, DT_RIGHT | DT_TOP);
+
+    if (i == 8) { // UI SCALE Slider
+      int barW = S(100);
+      RECT rSlider = {rItem.right - barW, rItem.top + S(5), rItem.right,
+                      rItem.top + S(20)};
+      DrawPlate(hdc, rSlider, false, S(2));
+      float pct = (g_uiScale - 0.5f) / 2.0f; // 0.5 to 2.5
+      if (pct < 0)
+        pct = 0;
+      if (pct > 1)
+        pct = 1;
+      RECT rThumb = {rSlider.left + (int)(pct * (barW - S(10))),
+                     rSlider.top - S(2),
+                     rSlider.left + (int)(pct * (barW - S(10))) + S(10),
+                     rSlider.bottom + S(2)};
+      DrawPlate(hdc, rThumb, true, S(2));
+      TCHAR scaleBuf[16];
+      _stprintf(scaleBuf, _T("%.1fx"), g_uiScale);
+      RECT rVal = {rItem.left, rItem.top, rItem.right - barW - S(10),
+                   rItem.bottom};
+      DrawText(hdc, scaleBuf, -1, &rVal, DT_RIGHT | DT_TOP | DT_SINGLELINE);
+    } else {
+      DrawText(hdc, values[i], -1, &rItem, DT_RIGHT | DT_TOP);
+    }
   }
   DrawParticles(hdc, r);
 }
@@ -864,14 +916,14 @@ void DrawTodoDetail(HDC hdc, RECT r) {
   DeleteObject(hbg);
   SelectObject(hdc, hFontUI);
   SetTextColor(hdc, COL_ACCENT);
-  RECT rTitle = {r.left + 20, r.top + 20, r.right - 20, r.top + 60};
+  RECT rTitle = {r.left + S(20), r.top + S(20), r.right - S(20), r.top + S(60)};
   SetBkMode(hdc, TRANSPARENT);
   DrawText(hdc, _T("TODO LIST (TofuMental Sync)"), -1, &rTitle,
            DT_LEFT | DT_TOP);
   SelectObject(hdc, hFontMain);
   for (int i = 0; i < 10 && (size_t)i < todos.size(); i++) {
-    RECT rItem = {r.left + 40, r.top + 80 + i * 35, r.right - 40,
-                  r.top + 115 + i * 35};
+    RECT rItem = {r.left + S(40), r.top + S(80) + i * S(35), r.right - S(40),
+                  r.top + S(115) + i * S(35)};
     if (i == g_viewFocus)
       SetTextColor(hdc, RGB(255, 0, 0));
     else
@@ -891,7 +943,7 @@ void DrawDictionaryDetail(HDC hdc, RECT r) {
   DeleteObject(hbg);
   SelectObject(hdc, hFontUI);
   SetTextColor(hdc, COL_ACCENT);
-  RECT rTitle = {r.left + 20, r.top + 20, r.right - 20, r.top + 60};
+  RECT rTitle = {r.left + S(20), r.top + S(20), r.right - S(20), r.top + S(60)};
   SetBkMode(hdc, TRANSPARENT);
   DrawText(hdc, _T("DICTIONARY DETAILS"), -1, &rTitle, DT_LEFT | DT_TOP);
   int total = (int)dictionary.size();
@@ -899,17 +951,17 @@ void DrawDictionaryDetail(HDC hdc, RECT r) {
     return;
   for (int i = 0; i < 3; i++) {
     int idx = (g_viewFocus + i) % total;
-    RECT rBox = {r.left + 20, r.top + 80 + i * 115, r.right - 20,
-                 r.top + 185 + i * 115};
+    RECT rBox = {r.left + S(20), r.top + S(80) + i * S(115), r.right - S(20),
+                 r.top + S(185) + i * S(115)};
     DrawPlate(hdc, rBox, true);
-    RECT rWord = {rBox.left + 15, rBox.top + 15, rBox.right - 15,
-                  rBox.top + 45};
+    RECT rWord = {rBox.left + S(15), rBox.top + S(15), rBox.right - S(15),
+                  rBox.top + S(45)};
     SelectObject(hdc, hFontMain);
     SetTextColor(hdc, COL_TEXT);
     DrawText(hdc, dictionary[idx].word.c_str(), -1, &rWord,
              DT_LEFT | DT_TOP | DT_SINGLELINE);
-    RECT rJp = {rBox.left + 15, rBox.top + 50, rBox.right - 15,
-                rBox.bottom - 10};
+    RECT rJp = {rBox.left + S(15), rBox.top + S(50), rBox.right - S(15),
+                rBox.bottom - S(10)};
     SelectObject(hdc, hFontJp);
     DrawText(hdc, dictionary[idx].jp.c_str(), -1, &rJp,
              DT_LEFT | DT_TOP | DT_WORDBREAK);
@@ -917,35 +969,37 @@ void DrawDictionaryDetail(HDC hdc, RECT r) {
 }
 
 void DrawDashboard(HDC hdc, RECT rDash) {
-  RECT rUpper = {rDash.left + 10, 10 + driftY, rDash.right - 10,
-                 rDash.bottom / 2 - 5 + driftY};
+  RECT rUpper = {rDash.left + S(10), S(10) + driftY, rDash.right - S(10),
+                 rDash.bottom / 2 - S(5) + driftY};
   DrawPlate(hdc, rUpper, false);
-  RECT rClockRect = {rUpper.left + 10, rUpper.top + 10, rUpper.right - 160,
-                     rUpper.bottom - 10};
+  RECT rClockRect = {rUpper.left + S(10), rUpper.top + S(10),
+                     rUpper.right - S(160), rUpper.bottom - S(10)};
   DrawClockModule(hdc, rClockRect);
-  RECT rCalRect = {rUpper.right - 150, rUpper.top + 10, rUpper.right - 10,
-                   rUpper.bottom - 10};
+  RECT rCalRect = {rUpper.right - S(150), rUpper.top + S(10),
+                   rUpper.right - S(10), rUpper.bottom - S(10)};
   DrawCalendarModule(hdc, rCalRect);
   int midX = (rDash.left + rDash.right) / 2,
-      midY = (rDash.top + rDash.bottom) / 2, hBound = rDash.bottom - 10;
-  RECT rL1 = {rDash.left + 10, midY + 5, midX - 5, midY + (hBound - midY) / 2};
+      midY = (rDash.top + rDash.bottom) / 2, hBound = rDash.bottom - S(10);
+  RECT rL1 = {rDash.left + S(10), midY + S(5), midX - S(5),
+              midY + (hBound - midY) / 2};
   DrawPlate(hdc, rL1, true);
   DrawTimeModule(hdc, rL1);
-  RECT rL2 = {midX + 5, midY + 5, rDash.right - 10, midY + (hBound - midY) / 2};
+  RECT rL2 = {midX + S(5), midY + S(5), rDash.right - S(10),
+              midY + (hBound - midY) / 2};
   DrawPlate(hdc, rL2, true);
   DrawTodoModule(hdc, rL2);
-  RECT rL3 = {rDash.left + 10, midY + (hBound - midY) / 2 + 5, midX - 5,
-              hBound};
+  RECT rL3 = {rDash.left + S(10), midY + (hBound - midY) / 2 + S(5),
+              midX - S(5), hBound};
   DrawPlate(hdc, rL3, true);
   DrawDictionaryModule(hdc, rL3);
-  RECT rL4 = {midX + 5, midY + (hBound - midY) / 2 + 5, rDash.right - 10,
-              hBound};
+  RECT rL4 = {midX + S(5), midY + (hBound - midY) / 2 + S(5),
+              rDash.right - S(10), hBound};
   DrawPlate(hdc, rL4, true);
   DrawSystemModule(hdc, rL4);
   SetTextColor(hdc, RGB(128, 128, 128));
   SelectObject(hdc, hFontTiny);
-  RECT rLogo = {rDash.right - 100, rDash.bottom - 20, rDash.right - 10,
-                rDash.bottom - 5};
+  RECT rLogo = {rDash.right - S(100), rDash.bottom - S(20), rDash.right - S(10),
+                rDash.bottom - S(5)};
   DrawText(hdc, _T("DP-05 V2"), -1, &rLogo,
            DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
 }
@@ -1082,20 +1136,75 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
       }
       InvalidateRect(hWnd, NULL, FALSE);
     } else if (wParam == ID_TIMER_ANIMATION) {
-      if (g_currentView == VIEW_CLOCK)
-        UpdateParticles(clientRect.right, clientRect.bottom, 0.4f, 0.1f);
-      else
-        UpdateParticles(clientRect.right, clientRect.bottom, 0.7f, 0.25f);
+      RECT cr;
+      GetClientRect(hWnd, &cr);
+      float sw = (float)(cr.right - cr.left);
+      float sh = (float)(cr.bottom - cr.top);
+      float ys = 0.0f, yr = 1.0f;
+
+      if (settingsOpen) {
+        int vis = (cr.bottom - cr.top - S(70)) / S(32);
+        if (vis < 1)
+          vis = 1;
+        if (vis > 10)
+          vis = 10;
+        float lastY = (float)(S(65) + vis * S(32));
+        ys = lastY / sh;
+        yr = (sh - lastY) / sh;
+      } else if (g_currentView == VIEW_CLOCK) {
+        float midY = sh / 2.0f;
+        ys = 210.0f / sh;
+        yr = (midY - 210.0f) / sh;
+      } else if (g_currentView == VIEW_TODO) {
+        int itemCount = (int)todos.size();
+        if (itemCount > 10)
+          itemCount = 10;
+        float lastY = (float)(S(80) + itemCount * S(35));
+        ys = lastY / sh;
+        yr = (sh - lastY) / sh;
+      } else if (g_currentView == VIEW_DASHBOARD) {
+        ys = 0.4f;
+        yr = 0.1f; // Default dashboard range
+      } else {
+        ys = 0.7f;
+        yr = 0.25f;
+      }
+
+      if (yr < 0.05f)
+        yr = 0.05f; // Ensure at least some range
+      UpdateParticles((int)sw, (int)sh, ys, yr);
       InvalidateRect(hWnd, NULL, FALSE);
     }
     break;
   case WM_KEYDOWN:
     if (settingsOpen) {
       if (wParam == VK_UP) {
-        settingsFocus = (settingsFocus + 8) % 9;
+        settingsFocus = (settingsFocus + 9) % 10;
+        RECT cr;
+        GetClientRect(hWnd, &cr);
+        int vis = (cr.bottom - cr.top - S(70)) / S(32);
+        if (vis < 1)
+          vis = 1;
+        if (vis > 10)
+          vis = 10;
+        if (settingsFocus < settingsScroll)
+          settingsScroll = settingsFocus;
+        if (settingsFocus >= settingsScroll + vis)
+          settingsScroll = settingsFocus - vis + 1;
         InvalidateRect(hWnd, NULL, TRUE);
       } else if (wParam == VK_DOWN) {
-        settingsFocus = (settingsFocus + 1) % 9;
+        settingsFocus = (settingsFocus + 1) % 10;
+        RECT cr;
+        GetClientRect(hWnd, &cr);
+        int vis = (cr.bottom - cr.top - S(70)) / S(32);
+        if (vis < 1)
+          vis = 1;
+        if (vis > 10)
+          vis = 10;
+        if (settingsFocus >= settingsScroll + vis)
+          settingsScroll = settingsFocus - vis + 1;
+        if (settingsFocus < settingsScroll)
+          settingsScroll = settingsFocus;
         InvalidateRect(hWnd, NULL, TRUE);
       } else if (wParam == VK_LEFT || wParam == VK_RIGHT ||
                  wParam == VK_SPACE || wParam == VK_RETURN) {
@@ -1150,7 +1259,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
           SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                            SWP_FRAMECHANGED);
-        } else if (settingsFocus == 8 &&
+        } else if (settingsFocus == 8) {
+          if (wParam == VK_LEFT)
+            g_uiScale -= 0.1f;
+          else if (wParam == VK_RIGHT)
+            g_uiScale += 0.1f;
+          if (g_uiScale < 0.5f)
+            g_uiScale = 0.5f;
+          if (g_uiScale > 2.5f)
+            g_uiScale = 2.5f;
+          needsFont = true;
+        } else if (settingsFocus == 9 &&
                    (wParam == VK_RETURN || wParam == VK_SPACE)) {
           if (!g_isTransitioning) {
             HDC hdc = GetDC(hWnd);
@@ -1421,35 +1540,48 @@ int main(int /*argc*/, char ** /*argv*/) {
   SendMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
   LoadSettings();
 #else
-int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                     LPTSTR lpCmdLine, int nCmdShow) {
+int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/,
+                     LPTSTR /*lpCmdLine*/, int nCmdShow) {
   GetModuleFileName(NULL, appPath, MAX_PATH);
   TCHAR *lastSlash = _tcsrchr(appPath, _T('\\'));
   if (!lastSlash)
     lastSlash = _tcsrchr(appPath, _T('/'));
   if (lastSlash)
     *(lastSlash + 1) = _T('\0');
+
   for (int i = 0; i < g_fontCount; i++) {
     TCHAR fPath[MAX_PATH];
-    _tcscpy(fPath, appPath);
-    _tcscat(fPath, g_fonts[i].fileName);
+    PathJoin(fPath, appPath, g_fonts[i].fileName);
     AddFontResource(fPath);
   }
-  SendMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
+
   LoadSettings();
 #endif
   WNDCLASS wc;
   memset(&wc, 0, sizeof(WNDCLASS));
+  wc.style = CS_HREDRAW | CS_VREDRAW;
   wc.lpfnWndProc = WindowProc;
   wc.hInstance = hInstance;
+  wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wc.lpszClassName = _T("DP05_Dashboard");
-  RegisterClass(&wc);
+
+  if (!RegisterClass(&wc)) {
+    return 0;
+  }
+
+  clientRect.left = 0;
+  clientRect.top = 0;
+  clientRect.right = 800;
+  clientRect.bottom = 480;
+
   HWND hWnd = CreateWindowEx(WS_EX_TOPMOST, _T("DP05_Dashboard"),
                              _T("DP-05 Dashboard"), WS_POPUP | WS_THICKFRAME, 0,
                              0, 800, 480, NULL, NULL, hInstance, NULL);
-  if (!hWnd)
+  if (!hWnd) {
     return 0;
+  }
+
   ShowWindow(hWnd, nCmdShow);
   UpdateWindow(hWnd);
   MSG msg;
