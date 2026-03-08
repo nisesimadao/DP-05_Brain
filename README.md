@@ -55,6 +55,7 @@ Sharp Brain PW-SH2 (Windows Embedded CE 6.0) 向けに開発された、Teenage 
 ```
 
 ## 🛠 ビルド方法
+### Unix
 
 ### Windows Embedded CE 6.0 (Sharp Brain)
 
@@ -74,6 +75,30 @@ MinGW-w64 (`x86_64-w64-mingw32-g++`) 環境が必要です。
 ```bash
 cd build_scripts
 ./build_win10.sh
+```
+
+`dist_win10` フォルダに実行ファイル (`AppMain_win10.exe`) が生成されます。
+
+### Windows
+
+### Windows Embedded CE 6.0 (Sharp Brain)
+
+CeGCC,WSL環境が必要です。
+
+```PowerShell
+cd build_scripts
+./build_ce.ps1
+```
+
+ビルド成功後、アセットと共に `Example` フォルダに同期されます。SDカードへの自動デプロイ機能も含まれています。
+
+### Windows 10 (Desktop Preview)
+
+Visual Studio 2022 (MSVC) 環境が必要です。
+
+```PowerShell
+cd build_scripts
+./build_win10.ps1
 ```
 
 `dist_win10` フォルダに実行ファイル (`AppMain_win10.exe`) が生成されます。

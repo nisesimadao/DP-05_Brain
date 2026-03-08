@@ -678,7 +678,7 @@ void UpdateParticles(int width, int height, float yStartPct, float yRangePct) {
   }
 }
 
-void DrawParticles(HDC hdc, RECT r) {
+void DrawParticles(HDC hdc, RECT /*r*/) {
   for (const auto &p : g_particles) {
     for (int j = 4; j >= 0; j--) {
       float tSize = p.size * (1.0f - (float)j * 0.15f);
@@ -1388,7 +1388,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 }
 
 #ifdef UNDER_CE
-int main(int argc, char **argv) {
+int main(int /*argc*/, char ** /*argv*/) {
   HINSTANCE hInstance = GetModuleHandle(NULL);
   int nCmdShow = SW_SHOW;
   GetModuleFileName(NULL, appPath, MAX_PATH);
