@@ -13,6 +13,7 @@
 #endif
 
 #include "Dictionary.h"
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <initguid.h>
@@ -22,7 +23,7 @@
 #include <vector>
 #include <wctype.h>
 #include <windows.h>
-#include <algorithm>
+
 
 // --- Constants ---
 #define ID_TIMER_CLOCK 1
@@ -60,7 +61,6 @@ bool isSplashing = true;
 DWORD splashStartTime = 0;
 int fontWeight = FW_BOLD;
 bool g_isDecorated = false; // Borderless by default
-
 
 // Transition State
 bool settingsOpen = false;
@@ -640,13 +640,15 @@ void InitParticles(int width, int height, float yStartPct, float yRangePct) {
     p.speed = 1.0f + (float)(rand() % 100) / 40.0f;
     p.waveOffset = (float)(rand() % 360);
     p.size = 2.0f + (float)(rand() % 3);
-    
+
     // Add color mural (variation)
     int r = GetRValue(baseColor) + (rand() % 41 - 20);
     int g = GetGValue(baseColor) + (rand() % 41 - 20);
     int b = GetBValue(baseColor) + (rand() % 41 - 20);
-    p.color = RGB(std::max(0, std::min(255, r)), std::max(0, std::min(255, g)), std::max(0, std::min(255, b)));
-    
+    p.color = RGB((std::max)(0, (std::min)(255, r)),
+                  (std::max)(0, (std::min)(255, g)),
+                  (std::max)(0, (std::min)(255, b)));
+
     for (int j = 0; j < 5; j++) {
       p.trailX[j] = p.x;
       p.trailY[j] = p.y;
@@ -669,7 +671,8 @@ void UpdateParticles(int width, int height, float yStartPct, float yRangePct) {
     p.waveOffset += 0.08f;
     if (p.x > width) {
       p.x = -15;
-      p.y = (float)((height * yStartPct) + (rand() % (int)(height * yRangePct)));
+      p.y =
+          (float)((height * yStartPct) + (rand() % (int)(height * yRangePct)));
       for (int j = 0; j < 5; j++) {
         p.trailX[j] = p.x;
         p.trailY[j] = p.y;
@@ -682,9 +685,11 @@ void DrawParticles(HDC hdc, RECT /*r*/) {
   for (const auto &p : g_particles) {
     for (int j = 4; j >= 0; j--) {
       float tSize = p.size * (1.0f - (float)j * 0.15f);
-      if (tSize < 1.0f) tSize = 1.0f;
-      HBRUSH hBrush = CreateSolidBrush(p.color); 
-      RECT pr = {(int)p.trailX[j], (int)p.trailY[j], (int)(p.trailX[j] + tSize), (int)(p.trailY[j] + tSize)};
+      if (tSize < 1.0f)
+        tSize = 1.0f;
+      HBRUSH hBrush = CreateSolidBrush(p.color);
+      RECT pr = {(int)p.trailX[j], (int)p.trailY[j], (int)(p.trailX[j] + tSize),
+                 (int)(p.trailY[j] + tSize)};
       FillRect(hdc, &pr, hBrush);
       DeleteObject(hBrush);
     }
@@ -700,11 +705,10 @@ void DrawSettings(HDC hdc, RECT r) {
   HBRUSH hbg = CreateSolidBrush(COL_BG);
   FillRect(hdc, &r, hbg);
   DeleteObject(hbg);
-  const TCHAR *menu[] = {_T("NIGHT MODE"),    _T("ACCENT COLOR"),
-                         _T("BURN-IN GUARD"), _T("FONT WEIGHT"),
-                         _T("CLOCK FONT"),    _T("MAIN FONT"),
-                         _T("MONITOR SIZE"),  _T("WINDOW FRAME"),
-                         _T("CLOSE")};
+  const TCHAR *menu[] = {
+      _T("NIGHT MODE"),   _T("ACCENT COLOR"), _T("BURN-IN GUARD"),
+      _T("FONT WEIGHT"),  _T("CLOCK FONT"),   _T("MAIN FONT"),
+      _T("MONITOR SIZE"), _T("WINDOW FRAME"), _T("CLOSE")};
   const TCHAR *values[] = {nightMode ? _T("ON") : _T("OFF"),
                            g_accents[g_selectedAccent].name,
                            burninGuard ? _T("ON") : _T("OFF"),
@@ -993,11 +997,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
     RefreshFonts();
     InitDashboardData();
     if (g_currentView == VIEW_CLOCK)
-      InitParticles(clientRect.right > 0 ? clientRect.right : 800, clientRect.bottom > 0 ? clientRect.bottom : 480, 0.4f, 0.1f);
+      InitParticles(clientRect.right > 0 ? clientRect.right : 800,
+                    clientRect.bottom > 0 ? clientRect.bottom : 480, 0.4f,
+                    0.1f);
     else
-      InitParticles(clientRect.right > 0 ? clientRect.right : 800, clientRect.bottom > 0 ? clientRect.bottom : 480, 0.7f, 0.25f);
-    
-    if (g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO || settingsOpen)
+      InitParticles(clientRect.right > 0 ? clientRect.right : 800,
+                    clientRect.bottom > 0 ? clientRect.bottom : 480, 0.7f,
+                    0.25f);
+
+    if (g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO ||
+        settingsOpen)
       SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
     break;
   case WM_SIZE:
@@ -1030,7 +1039,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         g_isTransitioning = false;
         g_transitionPos = g_targetSettingsState ? 1.0f : 0.0f;
         settingsOpen = g_targetSettingsState;
-        if (settingsOpen || g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO) {
+        if (settingsOpen || g_currentView == VIEW_CLOCK ||
+            g_currentView == VIEW_TODO) {
           SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
         } else {
           KillTimer(hWnd, ID_TIMER_ANIMATION);
@@ -1059,7 +1069,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         g_isViewTransitioning = false;
         g_viewTransitionPos = 0.0f;
         g_currentView = g_targetView;
-        if (g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO || settingsOpen) {
+        if (g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO ||
+            settingsOpen) {
           SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
         } else {
           KillTimer(hWnd, ID_TIMER_ANIMATION);
@@ -1289,13 +1300,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         g_isDecorated = !g_isDecorated;
         LONG style = GetWindowLong(hWnd, GWL_STYLE);
         if (g_isDecorated) {
-          style |= (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+          style |= (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX |
+                    WS_MAXIMIZEBOX | WS_SYSMENU);
           SetWindowLong(hWnd, GWL_STYLE, style);
-          SetWindowPos(hWnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+          SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                           SWP_FRAMECHANGED);
         } else {
-          style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+          style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX |
+                     WS_MAXIMIZEBOX | WS_SYSMENU);
           SetWindowLong(hWnd, GWL_STYLE, style);
-          SetWindowPos(hWnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+          SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                           SWP_FRAMECHANGED);
         }
         InvalidateRect(hWnd, NULL, TRUE);
       }
@@ -1428,9 +1445,9 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wc.lpszClassName = _T("DP05_Dashboard");
   RegisterClass(&wc);
-  HWND hWnd =
-      CreateWindowEx(WS_EX_TOPMOST, _T("DP05_Dashboard"), _T("DP-05 Dashboard"),
-                     WS_POPUP | WS_THICKFRAME, 0, 0, 800, 480, NULL, NULL, hInstance, NULL);
+  HWND hWnd = CreateWindowEx(WS_EX_TOPMOST, _T("DP05_Dashboard"),
+                             _T("DP-05 Dashboard"), WS_POPUP | WS_THICKFRAME, 0,
+                             0, 800, 480, NULL, NULL, hInstance, NULL);
   if (!hWnd)
     return 0;
   ShowWindow(hWnd, nCmdShow);
