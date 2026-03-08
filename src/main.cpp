@@ -28,6 +28,7 @@
 #define ID_TIMER_DRIFT 2
 #define ID_TIMER_TRANSITION 4
 #define ID_TIMER_VIEW_TRANSITION 8
+#define ID_TIMER_ANIMATION 16
 #define TIMER_CLOCK_MS 1000
 #define TIMER_DRIFT_MS 60000
 const int TRANSITION_STEP_MS = 20;
@@ -57,6 +58,8 @@ bool burninGuard = true;
 bool isSplashing = true;
 DWORD splashStartTime = 0;
 int fontWeight = FW_BOLD;
+bool g_isDecorated = false; // Borderless by default
+
 
 // Transition State
 bool settingsOpen = false;
@@ -83,6 +86,15 @@ int settingsFocus = 0;
 
 HBITMAP hDashCache = NULL;
 HBITMAP hSettCache = NULL;
+
+struct Particle {
+  float x, y;
+  float speed;
+  float waveOffset;
+  float size;
+  COLORREF color;
+};
+std::vector<Particle> g_particles;
 
 // Accents
 struct AccentInfo {
@@ -614,6 +626,41 @@ void DrawSystemModule(HDC hdc, RECT r) {
   DrawText(hdc, buf, -1, &rStat2, DT_LEFT | DT_TOP | DT_SINGLELINE);
 }
 
+void InitParticles(int width) {
+  g_particles.clear();
+  for (int i = 0; i < 40; i++) {
+    Particle p;
+    p.x = (float)(rand() % width);
+    p.y = (float)(320 + (rand() % 100));
+    p.speed = 1.0f + (float)(rand() % 100) / 50.0f;
+    p.waveOffset = (float)(rand() % 360);
+    p.size = 2.0f + (float)(rand() % 3);
+    p.color = g_accents[g_selectedAccent].color;
+    g_particles.push_back(p);
+  }
+}
+
+void UpdateParticles(int width) {
+  for (auto &p : g_particles) {
+    p.x += p.speed;
+    p.waveOffset += 0.05f;
+    if (p.x > width) {
+      p.x = -10;
+      p.y = (float)(320 + (rand() % 100));
+    }
+  }
+}
+
+void DrawParticles(HDC hdc, RECT r) {
+  for (const auto &p : g_particles) {
+    int py = (int)(p.y + sin(p.waveOffset) * 10);
+    HBRUSH hBrush = CreateSolidBrush(p.color);
+    RECT pr = {(int)p.x, py, (int)(p.x + p.size), (int)(py + p.size)};
+    FillRect(hdc, &pr, hBrush);
+    DeleteObject(hBrush);
+  }
+}
+
 void DrawSettings(HDC hdc, RECT r) {
   HBRUSH hbg = CreateSolidBrush(COL_BG);
   FillRect(hdc, &r, hbg);
@@ -645,6 +692,7 @@ void DrawSettings(HDC hdc, RECT r) {
     DrawText(hdc, menu[i], -1, &rItem, DT_LEFT | DT_TOP);
     DrawText(hdc, values[i], -1, &rItem, DT_RIGHT | DT_TOP);
   }
+  DrawParticles(hdc, r);
 }
 
 void DrawCalendarLarge(HDC hdc, RECT r) {
@@ -904,6 +952,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
     UpdateColors();
     RefreshFonts();
     InitDashboardData();
+    InitParticles(clientRect.right > 0 ? clientRect.right : 800);
     break;
   case WM_SIZE:
     GetClientRect(hWnd, &clientRect);
@@ -931,6 +980,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         g_isTransitioning = false;
         g_transitionPos = g_targetSettingsState ? 1.0f : 0.0f;
         settingsOpen = g_targetSettingsState;
+        if (settingsOpen) {
+          SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
+        } else {
+          KillTimer(hWnd, ID_TIMER_ANIMATION);
+        }
         if (hDashCache) {
           DeleteObject(hDashCache);
           hDashCache = NULL;
@@ -960,6 +1014,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         float easedT = 1.0f - pow(1.0f - t, 3.0f);
         g_viewTransitionPos = easedT;
       }
+      InvalidateRect(hWnd, NULL, FALSE);
+    } else if (wParam == ID_TIMER_ANIMATION) {
+      UpdateParticles(clientRect.right);
       InvalidateRect(hWnd, NULL, FALSE);
     }
     break;
@@ -1143,6 +1200,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
           SaveTofuTasks();
           InvalidateRect(hWnd, NULL, FALSE);
         }
+      } else if (wParam == 'F' || wParam == 'f') {
+        g_isDecorated = !g_isDecorated;
+        LONG style = GetWindowLong(hWnd, GWL_STYLE);
+        if (g_isDecorated) {
+          style |= (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+          SetWindowLong(hWnd, GWL_STYLE, style);
+          SetWindowPos(hWnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        } else {
+          style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+          SetWindowLong(hWnd, GWL_STYLE, style);
+          SetWindowPos(hWnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        }
+        InvalidateRect(hWnd, NULL, TRUE);
       }
     }
     break;
@@ -1275,7 +1345,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   RegisterClass(&wc);
   HWND hWnd =
       CreateWindowEx(WS_EX_TOPMOST, _T("DP05_Dashboard"), _T("DP-05 Dashboard"),
-                     WS_POPUP, 0, 0, 800, 480, NULL, NULL, hInstance, NULL);
+                     WS_POPUP | WS_THICKFRAME, 0, 0, 800, 480, NULL, NULL, hInstance, NULL);
   if (!hWnd)
     return 0;
   ShowWindow(hWnd, nCmdShow);
