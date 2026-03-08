@@ -22,6 +22,7 @@
 #include <vector>
 #include <wctype.h>
 #include <windows.h>
+#include <algorithm>
 
 // --- Constants ---
 #define ID_TIMER_CLOCK 1
@@ -93,6 +94,8 @@ struct Particle {
   float waveOffset;
   float size;
   COLORREF color;
+  float trailX[5];
+  float trailY[5];
 };
 std::vector<Particle> g_particles;
 
@@ -626,35 +629,67 @@ void DrawSystemModule(HDC hdc, RECT r) {
   DrawText(hdc, buf, -1, &rStat2, DT_LEFT | DT_TOP | DT_SINGLELINE);
 }
 
-void InitParticles(int width) {
+void InitParticles(int width, int height, float yStartPct, float yRangePct) {
   g_particles.clear();
-  for (int i = 0; i < 40; i++) {
+  int count = (width > 800) ? 60 : 40;
+  COLORREF baseColor = g_accents[g_selectedAccent].color;
+  for (int i = 0; i < count; i++) {
     Particle p;
     p.x = (float)(rand() % width);
-    p.y = (float)(320 + (rand() % 100));
-    p.speed = 1.0f + (float)(rand() % 100) / 50.0f;
+    p.y = (float)((height * yStartPct) + (rand() % (int)(height * yRangePct)));
+    p.speed = 1.0f + (float)(rand() % 100) / 40.0f;
     p.waveOffset = (float)(rand() % 360);
     p.size = 2.0f + (float)(rand() % 3);
-    p.color = g_accents[g_selectedAccent].color;
+    
+    // Add color mural (variation)
+    int r = GetRValue(baseColor) + (rand() % 41 - 20);
+    int g = GetGValue(baseColor) + (rand() % 41 - 20);
+    int b = GetBValue(baseColor) + (rand() % 41 - 20);
+    p.color = RGB(std::max(0, std::min(255, r)), std::max(0, std::min(255, g)), std::max(0, std::min(255, b)));
+    
+    for (int j = 0; j < 5; j++) {
+      p.trailX[j] = p.x;
+      p.trailY[j] = p.y;
+    }
     g_particles.push_back(p);
   }
 }
 
-void UpdateParticles(int width) {
+void UpdateParticles(int width, int height, float yStartPct, float yRangePct) {
   for (auto &p : g_particles) {
+    for (int j = 4; j > 0; j--) {
+      p.trailX[j] = p.trailX[j - 1];
+      p.trailY[j] = p.trailY[j - 1];
+    }
+    p.trailX[0] = p.x;
+    int currentY = (int)(p.y + sin(p.waveOffset) * 15);
+    p.trailY[0] = (float)currentY;
+
     p.x += p.speed;
-    p.waveOffset += 0.05f;
+    p.waveOffset += 0.08f;
     if (p.x > width) {
-      p.x = -10;
-      p.y = (float)(320 + (rand() % 100));
+      p.x = -15;
+      p.y = (float)((height * yStartPct) + (rand() % (int)(height * yRangePct)));
+      for (int j = 0; j < 5; j++) {
+        p.trailX[j] = p.x;
+        p.trailY[j] = p.y;
+      }
     }
   }
 }
 
 void DrawParticles(HDC hdc, RECT r) {
   for (const auto &p : g_particles) {
-    int py = (int)(p.y + sin(p.waveOffset) * 10);
+    for (int j = 4; j >= 0; j--) {
+      float tSize = p.size * (1.0f - (float)j * 0.15f);
+      if (tSize < 1.0f) tSize = 1.0f;
+      HBRUSH hBrush = CreateSolidBrush(p.color); 
+      RECT pr = {(int)p.trailX[j], (int)p.trailY[j], (int)(p.trailX[j] + tSize), (int)(p.trailY[j] + tSize)};
+      FillRect(hdc, &pr, hBrush);
+      DeleteObject(hBrush);
+    }
     HBRUSH hBrush = CreateSolidBrush(p.color);
+    int py = (int)(p.y + sin(p.waveOffset) * 15);
     RECT pr = {(int)p.x, py, (int)(p.x + p.size), (int)(py + p.size)};
     FillRect(hdc, &pr, hBrush);
     DeleteObject(hBrush);
@@ -668,6 +703,7 @@ void DrawSettings(HDC hdc, RECT r) {
   const TCHAR *menu[] = {_T("NIGHT MODE"),    _T("ACCENT COLOR"),
                          _T("BURN-IN GUARD"), _T("FONT WEIGHT"),
                          _T("CLOCK FONT"),    _T("MAIN FONT"),
+                         _T("MONITOR SIZE"),  _T("WINDOW FRAME"),
                          _T("CLOSE")};
   const TCHAR *values[] = {nightMode ? _T("ON") : _T("OFF"),
                            g_accents[g_selectedAccent].name,
@@ -675,6 +711,8 @@ void DrawSettings(HDC hdc, RECT r) {
                            fontWeight == FW_BOLD ? _T("BOLD") : _T("NORMAL"),
                            g_fonts[g_selectedClockFont].displayName,
                            g_fonts[g_selectedMainFont].displayName,
+                           _T("MAXIMIZE"),
+                           g_isDecorated ? _T("ON") : _T("OFF"),
                            _T("")};
   SetBkMode(hdc, TRANSPARENT);
   SelectObject(hdc, hFontMain);
@@ -682,7 +720,7 @@ void DrawSettings(HDC hdc, RECT r) {
   RECT rTitle = {r.left, r.top + 10, r.right, r.top + 50};
   DrawText(hdc, _T("SETTINGS"), -1, &rTitle, DT_CENTER | DT_TOP);
   SelectObject(hdc, hFontUI);
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < 9; i++) {
     RECT rItem = {r.left + 50, r.top + 60 + i * 32, r.right - 50,
                   r.top + 92 + i * 32};
     if (i == settingsFocus)
@@ -813,6 +851,7 @@ void DrawClockDetail(HDC hdc, RECT r) {
 
   // Draw Large Calendar in bottom half
   DrawCalendarLarge(hdc, rBottom);
+  DrawParticles(hdc, r);
 }
 
 void DrawTodoDetail(HDC hdc, RECT r) {
@@ -839,6 +878,7 @@ void DrawTodoDetail(HDC hdc, RECT r) {
     DrawText(hdc, buf, -1, &rItem,
              DT_LEFT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
   }
+  DrawParticles(hdc, r);
 }
 
 void DrawDictionaryDetail(HDC hdc, RECT r) {
@@ -952,10 +992,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
     UpdateColors();
     RefreshFonts();
     InitDashboardData();
-    InitParticles(clientRect.right > 0 ? clientRect.right : 800);
+    if (g_currentView == VIEW_CLOCK)
+      InitParticles(clientRect.right > 0 ? clientRect.right : 800, clientRect.bottom > 0 ? clientRect.bottom : 480, 0.4f, 0.1f);
+    else
+      InitParticles(clientRect.right > 0 ? clientRect.right : 800, clientRect.bottom > 0 ? clientRect.bottom : 480, 0.7f, 0.25f);
+    
+    if (g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO || settingsOpen)
+      SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
     break;
   case WM_SIZE:
     GetClientRect(hWnd, &clientRect);
+    if (g_currentView == VIEW_CLOCK)
+      InitParticles(clientRect.right, clientRect.bottom, 0.4f, 0.1f);
+    else
+      InitParticles(clientRect.right, clientRect.bottom, 0.7f, 0.25f);
     break;
   case WM_ERASEBKGND:
     return 1;
@@ -980,7 +1030,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         g_isTransitioning = false;
         g_transitionPos = g_targetSettingsState ? 1.0f : 0.0f;
         settingsOpen = g_targetSettingsState;
-        if (settingsOpen) {
+        if (settingsOpen || g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO) {
           SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
         } else {
           KillTimer(hWnd, ID_TIMER_ANIMATION);
@@ -1009,6 +1059,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
         g_isViewTransitioning = false;
         g_viewTransitionPos = 0.0f;
         g_currentView = g_targetView;
+        if (g_currentView == VIEW_CLOCK || g_currentView == VIEW_TODO || settingsOpen) {
+          SetTimer(hWnd, ID_TIMER_ANIMATION, 16, NULL);
+        } else {
+          KillTimer(hWnd, ID_TIMER_ANIMATION);
+        }
         KillTimer(hWnd, ID_TIMER_VIEW_TRANSITION);
       } else {
         float easedT = 1.0f - pow(1.0f - t, 3.0f);
@@ -1016,17 +1071,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
       }
       InvalidateRect(hWnd, NULL, FALSE);
     } else if (wParam == ID_TIMER_ANIMATION) {
-      UpdateParticles(clientRect.right);
+      if (g_currentView == VIEW_CLOCK)
+        UpdateParticles(clientRect.right, clientRect.bottom, 0.4f, 0.1f);
+      else
+        UpdateParticles(clientRect.right, clientRect.bottom, 0.7f, 0.25f);
       InvalidateRect(hWnd, NULL, FALSE);
     }
     break;
   case WM_KEYDOWN:
     if (settingsOpen) {
       if (wParam == VK_UP) {
-        settingsFocus = (settingsFocus + 6) % 7;
+        settingsFocus = (settingsFocus + 8) % 9;
         InvalidateRect(hWnd, NULL, TRUE);
       } else if (wParam == VK_DOWN) {
-        settingsFocus = (settingsFocus + 1) % 7;
+        settingsFocus = (settingsFocus + 1) % 9;
         InvalidateRect(hWnd, NULL, TRUE);
       } else if (wParam == VK_LEFT || wParam == VK_RIGHT ||
                  wParam == VK_SPACE || wParam == VK_RETURN) {
@@ -1061,6 +1119,27 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
             g_selectedMainFont = (g_selectedMainFont + 1) % g_fontCount;
           needsFont = true;
         } else if (settingsFocus == 6 &&
+                   (wParam == VK_RETURN || wParam == VK_SPACE)) {
+          int screenW = GetSystemMetrics(SM_CXSCREEN);
+          int screenH = GetSystemMetrics(SM_CYSCREEN);
+          SetWindowPos(hWnd, NULL, 0, 0, screenW, screenH, SWP_NOZORDER);
+        } else if (settingsFocus == 7 &&
+                   (wParam == VK_RETURN || wParam == VK_SPACE ||
+                    wParam == VK_LEFT || wParam == VK_RIGHT)) {
+          g_isDecorated = !g_isDecorated;
+          LONG style = GetWindowLong(hWnd, GWL_STYLE);
+          if (g_isDecorated) {
+            style |= (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX |
+                      WS_MAXIMIZEBOX | WS_SYSMENU);
+          } else {
+            style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX |
+                       WS_MAXIMIZEBOX | WS_SYSMENU);
+          }
+          SetWindowLong(hWnd, GWL_STYLE, style);
+          SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                           SWP_FRAMECHANGED);
+        } else if (settingsFocus == 8 &&
                    (wParam == VK_RETURN || wParam == VK_SPACE)) {
           if (!g_isTransitioning) {
             HDC hdc = GetDC(hWnd);
@@ -1172,6 +1251,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam,
             g_targetView = static_cast<ViewMode>((g_currentView + 1) % 4);
           else
             g_targetView = static_cast<ViewMode>((g_currentView + 3) % 4);
+
+          if (g_targetView == VIEW_CLOCK)
+            InitParticles(clientRect.right, clientRect.bottom, 0.4f, 0.1f);
+          else
+            InitParticles(clientRect.right, clientRect.bottom, 0.7f, 0.25f);
+
           g_isViewTransitioning = true;
           g_viewTransitionPos = 0.0f;
           g_viewAnimStartTime = GetTickCount();
