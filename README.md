@@ -87,7 +87,7 @@ CeGCC と WSL が必要です。
 
 ```powershell
 cd build_scripts
-./build_ce.ps1
+./build.ps1
 ```
 
 ビルドに成功すると、実行ファイルとアセットを `Example` フォルダへ同期します。
